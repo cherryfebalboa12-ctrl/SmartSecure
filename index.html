@@ -1,390 +1,272 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SmartSecure Object Detection Scanner (Enhanced)</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartSecure Object Detection Scanner</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
-  <style>
-    :root {
-      --primary-color: #007bff; /* Blue for a modern look */
-      --background-color: #f0f2f5;
-      --container-color: #ffffff;
-      --text-color: #333;
-      --shadow-color: rgba(0, 0, 0, 0.15);
-      --safe-color: #28a745; /* Green */
-      --threat-color: #dc3545; /* Red */
-      --warning-color: #ffc107; /* Yellow */
-    }
+  <style>
+    :root {
+      --primary-color: #4CAF50;
+      --background-color: #e8f5e9;
+      --container-color: #ffffff;
+      --text-color: #2e7d32;
+      --shadow-color: rgba(0, 0, 0, 0.1);
+      --status-color: #66bb6a;
+    }
 
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--background-color);
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      min-height: 100vh;
-      padding: 20px;
-      margin: 0;
-    }
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: var(--background-color);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 20px;
+      margin: 0;
+    }
 
-    .container {
-      background: var(--container-color);
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 10px 20px var(--shadow-color);
-      text-align: center;
-      max-width: 700px;
-      width: 100%;
-      margin-top: 30px;
-    }
+    .container {
+      background: var(--container-color);
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 6px 15px var(--shadow-color);
+      text-align: center;
+      max-width: 650px;
+      width: 100%;
+      position: relative;
+      margin-top: 20px;
+    }
 
-    h1 {
-      color: var(--primary-color);
-      margin-bottom: 5px;
-      font-size: 2rem;
-    }
+    h1 {
+      color: var(--text-color);
+      margin-bottom: 5px;
+      font-size: 1.8rem;
+    }
 
-    p {
-      color: #6c757d;
-      margin-bottom: 20px;
-    }
+    p {
+      color: #666;
+      margin-bottom: 20px;
+    }
 
-    .video-wrapper {
-      position: relative;
-      margin: 0 auto 20px auto;
-      display: block;
-      width: 640px; /* Standardizing for visual consistency */
-      height: 480px;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-      border-radius: 8px;
-      overflow: hidden;
-    }
+    /* FIX: Set a fixed size and use display: block for centering */
+    .video-wrapper {
+      position: relative;
+      margin: 0 auto 20px auto;
+      display: block; /* Changed from inline-block for proper centering */
+      width: 640px; /* Match video resolution */
+      height: 480px; /* Match video resolution */
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+    }
 
-    #webcam, #detectionCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 8px;
-    }
-    /* Initial hide for better loading transition */
-    #webcam, #detectionCanvas { visibility: hidden; }
-    #webcam.active, #detectionCanvas.active { visibility: visible; }
+    #webcam, #detectionCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%; /* Makes them fill the wrapper */
+      height: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+      display: none;
+    }
 
+    #webcam.active, #detectionCanvas.active {
+      display: block;
+      visibility: visible;
+    }
 
-    #status {
-      margin-top: 15px;
-      font-weight: bold;
-      padding: 15px;
-      border-radius: 8px;
-      background-color: #e9ecef;
-      color: var(--text-color);
-      transition: all 0.3s ease;
-      font-size: 1.1rem;
-      min-height: 25px; /* Prevent layout shift */
-    }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+      color: var(--status-color);
+      padding: 12px;
+      border: 1px solid var(--status-color);
+      border-radius: 5px;
+      background-color: #f1fff1;
+      transition: all 0.3s ease;
+    }
 
-    #status.safe {
-      color: var(--safe-color);
-      background-color: #d4edda;
-      border: 1px solid var(--safe-color);
-    }
+    #status.threat {
+      color: #d32f2f;
+      border-color: #d32f2f;
+      background-color: #ffeded;
+      animation: pulse 1s infinite alternate;
+    }
 
-    #status.threat {
-      color: var(--threat-color);
-      background-color: #f8d7da;
-      border: 1px solid var(--threat-color);
-      animation: pulse 1s infinite alternate;
-    }
-
-    #status.warning {
-      color: #856404;
-      background-color: #fff3cd;
-      border: 1px solid var(--warning-color);
-    }
-
-    @keyframes pulse {
-      from { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
-      to { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
-    }
-  </style>
+    @keyframes pulse {
+      from { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); }
+      to { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); }
+    }
+  </style>
 </head>
 <body>
-  <div class="container">
-    <h1>SmartSecure Live Scanner 🛡️</h1>
-    <p>Real-time Object Detection for Security Screening (COCO-SSD)</p>
+  <div class="container">
+    <h1>SmartSecure Live Scanner</h1>
+    <p>Testing Object Detection using COCO-SSD.</p>
 
-    <div id="videoWrapper" class="video-wrapper">
-      <video id="webcam" autoplay playsinline></video>
-      <canvas id="detectionCanvas"></canvas>
-    </div>
+    <div id="videoWrapper" class="video-wrapper">
+      <video id="webcam" autoplay playsinline></video>
+      <canvas id="detectionCanvas"></canvas>
+    </div>
 
-        <div id="status">⏳ Loading Model...</div>
-    <p id="sound-note" style="color:#6c757d; font-size:0.9rem;">Tap anywhere to enable immediate high-priority sound alerts.</p>
-  </div>
+    <audio id="alertSound" src="data:audio/mpeg;base64,..."></audio>
+    <div id="status">Scanner Ready</div>
+    <p style="color:#666; font-size:0.9rem;">Tap anywhere on the page to enable sound alerts.</p>
+  </div>
 
-  <script>
-    const video = document.getElementById('webcam');
-    const canvas = document.getElementById('detectionCanvas');
-    const ctx = canvas.getContext('2d');
-    const statusBox = document.getElementById('status');
-    const soundNote = document.getElementById('sound-note');
-    // Using a simple beep sound for a real alert.
-    // In production, this would be a high-priority alarm sound.
-    const ALERT_SOUND_BEEP = 'data:audio/mp3;base64,SUQzBAAAAAABVVlMRVMzLjkuMAAAAUZZSU5HAAAAJwAAAABJc29tZXRpbWUgLyBMYXZmNTcuODMuMTAwAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV Rameshwotting'; is not a valid audio base64 string.
-    
-    let audioContext = null;
-    let soundEnabled = false;
+  <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('detectionCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusBox = document.getElementById('status');
+    const alertSound = document.getElementById('alertSound');
 
-    // Enhanced list of potential threats, including misclassification targets
-    const DANGEROUS_OBJECTS = ["knife", "gun", "scissors", "baseball bat", "handgun", "baseball_bat", "firearm", "rifle", "sword"];
-    const LOW_CONFIDENCE_THRESHOLD = 0.5; // New constant for better threshold management
-    const DANGER_CONFIDENCE_THRESHOLD = 0.8; // High confidence for confirmed threats
+    let soundEnabled = false;
 
-    // Aggressively broad dangerous objects list (for a security context)
-    const DANGEROUS_ALIASES = {
-      "bottle": "blunt_object", // Potential blunt weapon
-      "cell phone": "distraction_device", // Cell phone as a forbidden item in secure areas
-      "tvmonitor": "large_screen_object" // Placeholder for an overly large/unusual item
-    };
+    // Tap anywhere to enable sound
+    document.body.addEventListener("click", () => {
+      if (!soundEnabled) {
+        soundEnabled = true;
+        // Attempt to play and immediately pause to initialize audio context
+        alertSound.play().then(() => {
+          alertSound.pause();
+          alertSound.currentTime = 0;
+        });
+        alert("Sound alerts enabled!");
+      }
+    });
 
-    // Map to correct common COCO-SSD mislabels (can be expanded with domain-specific knowledge)
-    const LABEL_CORRECTION_MAP = {
-      "fork": "utensil",
-      "spoon": "utensil",
-      "remote": "electronic_item",
-      "keyboard": "electronic_item",
-      "chair": "furniture",
-      "couch": "furniture",
-      "handbag": "bag",
-      "backpack": "bag",
-      "tennis racket": "sports_equipment",
-      "cup": "container",
-      "bowl": "container"
-    };
+    // Dangerous objects list
+    const dangerousObjects = ["knife", "gun", "scissors"];
 
-    function correctLabel(originalLabel) {
-      return LABEL_CORRECTION_MAP[originalLabel] || originalLabel;
-    }
-    
-    function getObjectStatus(label, score) {
-      const correctedLabel = correctLabel(label);
-      const lowerLabel = correctedLabel.toLowerCase();
+    // Correction map for known mislabels
+    const labelCorrectionMap = {
+      "sink": "knife",
+      "wine glass": "mouse",
+      "handbag": "bag",
+      "backpack": "bag",
+      "tie": "bracelet",
+      "pen": "ballpen",
+      "remote": "ballpen",
+      "couch": "chair",
+      "sofa": "chair"
+    };
 
-      if (DANGEROUS_OBJECTS.includes(lowerLabel)) {
-        return {
-          isThreat: true,
-          isWarning: false,
-          type: "Threat",
-          color: "var(--threat-color)"
-        };
-      }
+    function correctLabel(originalLabel) {
+      return labelCorrectionMap[originalLabel] || originalLabel;
+    }
 
-      // Treat low-confidence detections of non-common items as a warning
-      if (score < DANGER_CONFIDENCE_THRESHOLD && score >= LOW_CONFIDENCE_THRESHOLD && DANGEROUS_ALIASES[lowerLabel]) {
-        return {
-          isThreat: false,
-          isWarning: true,
-          type: "Warning",
-          color: "var(--warning-color)"
-        };
-      }
+    function isDangerous(label) {
+      return dangerousObjects.includes(label.toLowerCase());
+    }
 
-      return {
-        isThreat: false,
-        isWarning: false,
-        type: "Safe",
-        color: "var(--safe-color)"
-      };
-    }
+    async function setupCamera() {
+      // Requested resolution 640x480
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 }
+      });
+      video.srcObject = stream;
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => {
+          video.play();
+          resolve(video);
+        };
+      });
+    }
 
-    // Custom Audio Alert Handler using Web Audio API for better control
-    function initAudio() {
-      if (audioContext) return;
-      try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const audio = new Audio(ALERT_SOUND_BEEP);
-        // Initial play/pause to fulfill browser user interaction requirement
-        audio.play().then(() => {
-          audio.pause();
-          audioContext.close().catch(()=>{}); // Close if not needed immediately
-          audioContext = new (window.AudioContext || window.webkitAudioContext)(); // Re-initialize
-          soundEnabled = true;
-          console.log("Sound alerts enabled.");
-          soundNote.textContent = "🔊 Sound alerts are active.";
-        }).catch(err => {
-          console.warn("Audio initialization failed:", err);
-        });
-      } catch (e) {
-        console.error("Web Audio API not supported:", e);
-      }
-    }
+    async function run() {
+      await tf.setBackend('webgl'); // use WebGL for faster processing
+      const net = await cocoSsd.load();
+      await setupCamera();
+      
+      // Activate the video and canvas elements
+      video.classList.add("active");
+      canvas.classList.add("active");
 
-    function playThreatSound() {
-      if (!soundEnabled || !audioContext) return;
-      try {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+      // Set canvas size to match the actual video stream size
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+      detectFrame(video, net);
+    }
 
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4 note
-        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+    function detectFrame(video, net) {
+      net.detect(video).then(predictions => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        oscillator.start();
-        setTimeout(() => {
-          oscillator.stop();
-        }, 150); // Short beep
-      } catch (e) {
-        console.error("Error playing sound:", e);
-      }
-    }
+        let threatDetected = false;
 
+        predictions.forEach(prediction => {
+          // Confidence threshold (0.6 or 60%)
+          if (prediction.score < 0.6) return;
 
-    // Tap anywhere to enable sound (User interaction requirement)
-    document.body.addEventListener("click", initAudio, { once: true });
+          const correctedLabel = correctLabel(prediction.class);
+          const danger = isDangerous(correctedLabel);
 
-    async function setupCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: "environment" // Prefer rear camera on mobile
-          }
-        });
-        video.srcObject = stream;
-        return new Promise(resolve => {
-          video.onloadedmetadata = () => {
-            video.play();
-            resolve(video);
-          };
-        });
-      } catch (e) {
-        statusBox.textContent = "❌ Camera Access Denied or Failed: " + e.message;
-        statusBox.classList.add("threat");
-        console.error("Camera setup failed:", e);
-      }
-    }
+          // Frame color
+          const boxColor = danger ? "red" : "green";
 
-    async function run() {
-      try {
-        // Optimization: Use WebGL and prefer the lite model for faster FPS
-        await tf.setBackend('webgl');
-        const net = await cocoSsd.load('lite_mobilenet_v2'); // Using 'lite' model for performance
-        statusBox.textContent = "✅ Model Loaded. Setting up camera...";
+          ctx.beginPath();
+          ctx.rect(...prediction.bbox);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = boxColor;
+          ctx.stroke();
 
-        const videoElement = await setupCamera();
-        if (!videoElement) return;
+          // Label text (white, bold, larger)
+          ctx.font = "22px Arial bold";
+          ctx.fillStyle = boxColor; // Use box color for the text background
+          
+          // Draw a background rectangle for the text
+          const textWidth = ctx.measureText(correctedLabel).width;
+          const textHeight = 22; // Approximation
+          const x = prediction.bbox[0];
+          const y = prediction.bbox[1];
+          
+          // Position text box slightly above the bounding box
+          const textY = y > 25 ? y - 25 : 0; 
 
-        // Set canvas size
-        canvas.width = videoElement.videoWidth;
-        canvas.height = videoElement.videoHeight;
-        
-        // Activate the elements visually
-        video.classList.add("active");
-        canvas.classList.add("active");
+          ctx.fillRect(x, textY, textWidth + 10, textHeight + 5);
+          
+          // Draw the text itself
+          ctx.fillStyle = "white";
+          ctx.fillText(
+            correctedLabel,
+            x + 5,
+            y > 25 ? y - 5 : 20 // Adjusted text position
+          );
 
-        statusBox.textContent = "🟢 Scanner Running. Searching...";
-        statusBox.classList.add("safe");
+          // Status + sound alert logic
+          if (danger) {
+            threatDetected = true;
+            statusBox.textContent = `⚠️ Threat Detected: ${correctedLabel}`;
+            statusBox.classList.add("threat");
+            if (soundEnabled) {
+              alertSound.play().catch(err => {
+                console.log("Sound blocked until tap anywhere.");
+              });
+            }
+          }
+        });
 
-        detectFrame(videoElement, net);
+        if (!threatDetected) {
+            statusBox.textContent = "✅ Safe Object Detected";
+            statusBox.classList.remove("threat");
+            alertSound.pause();
+            alertSound.currentTime = 0;
+        }
 
-      } catch (error) {
-        statusBox.textContent = "⛔ Critical Error: " + error.message;
-        statusBox.classList.add("threat");
-        console.error("Initialization failed:", error);
-      }
-    }
+        // Loop the detection process
+        requestAnimationFrame(() => detectFrame(video, net));
+      });
+    }
 
-    function detectFrame(video, net) {
-      net.detect(video).then(predictions => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        let highThreatDetected = false;
-        let lowWarningDetected = false;
-        let highestThreatLabel = null;
-
-        for (const prediction of predictions) {
-          // Filter out very low confidence predictions
-          if (prediction.score < LOW_CONFIDENCE_THRESHOLD) continue;
-
-          const status = getObjectStatus(prediction.class, prediction.score);
-          const correctedLabel = correctLabel(prediction.class);
-          const labelWithScore = `${correctedLabel} (${(prediction.score * 100).toFixed(1)}%)`;
-
-          // Set the overall detection status
-          if (status.isThreat) {
-            highThreatDetected = true;
-            highestThreatLabel = highestThreatLabel || labelWithScore;
-          } else if (status.isWarning) {
-            lowWarningDetected = true;
-          }
-
-          // Draw Bounding Box
-          const boxColor = status.color;
-          const [x, y, width, height] = prediction.bbox;
-
-          ctx.beginPath();
-          ctx.rect(x, y, width, height);
-          ctx.lineWidth = status.isThreat ? 5 : 3; // Thicker border for threats
-          ctx.strokeStyle = boxColor;
-          ctx.stroke();
-
-          // Draw Label Text Background
-          ctx.font = "18px 'Segoe UI' bold";
-          const textWidth = ctx.measureText(labelWithScore).width;
-          const textHeight = 20;
-          const textY = y > 25 ? y - 25 : 0; 
-
-          ctx.fillStyle = boxColor;
-          ctx.fillRect(x - 1, textY, textWidth + 12, textHeight + 5);
-          
-          // Draw the Text
-          ctx.fillStyle = "white";
-          ctx.fillText(
-            labelWithScore,
-            x + 5,
-            y > 25 ? y - 5 : 20
-          );
-        }
-
-        // Update Global Status
-        if (highThreatDetected) {
-          statusBox.textContent = `🚨 IMMEDIATE THREAT: ${highestThreatLabel.split(' ')[0]} detected!`;
-          statusBox.classList.remove("safe", "warning");
-          statusBox.classList.add("threat");
-          playThreatSound();
-        } else if (lowWarningDetected) {
-          statusBox.textContent = "⚠️ Warning: Low-confidence detection or restricted item found.";
-          statusBox.classList.remove("safe", "threat");
-          statusBox.classList.add("warning");
-          // Optional: play a softer warning sound here
-        } else {
-          statusBox.textContent = "✅ System Clear. Scanning...";
-          statusBox.classList.remove("threat", "warning");
-          statusBox.classList.add("safe");
-        }
-
-        // Loop the detection process
-        requestAnimationFrame(() => detectFrame(video, net));
-      }).catch(err => {
-        console.error("Detection failed:", err);
-        // Add a non-fatal error status
-        statusBox.textContent = "Scanning Interrupted (Check Console)";
-        statusBox.classList.add("warning");
-      });
-    }
-
-    run();
-  </script>
+    // Start the application
+    run();
+  </script>
 </body>
+
 </html>
